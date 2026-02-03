@@ -6,10 +6,6 @@ branding:
   color: "blue"
 
 inputs:
-  perl-version:
-    description: 'The version of Perl to use.'
-    required: false
-    default: '5.36'
   project-path:
     description: 'The path to the project to be analyzed by Bunkai.'
     required: false
@@ -22,6 +18,10 @@ inputs:
     description: 'The paths to lint with Perl::Critic.'
     required: false
     default: 'lib bunkai.pl'
+  sarif-output:
+    description: 'The SARIF output file path.'
+    required: false
+    default: ''
   test-command:
     description: 'The command to run tests with coverage.'
     required: false
@@ -31,25 +31,6 @@ inputs:
       cover -test
 
 runs:
-  using: "composite"
-  steps:
-    - name: Set up Perl
-      uses: shogo82148/actions-setup-perl@v1
-      with:
-        perl-version: ${{ inputs.perl-version }}
-
-    - name: Install Dependencies
-      shell: bash
-      run: cpanm --installdeps --with-develop ${{ inputs.project-path }}
-
-    - name: Lint with Perl::Critic
-      shell: bash
-      run: perlcritic --severity ${{ inputs.perlcritic-severity }} ${{ inputs.perlcritic-paths }}
-
-    - name: Test with Coverage
-      shell: bash
-      run: ${{ inputs.test-command }}
-
-    - name: Run Bunkai
-      shell: bash
-      run: perl ${{ github.action_path }}/bunkai.pl --path ${{ inputs.project-path }}
+  using: docker
+  image: docker://ghcr.io/lesis-lat/bunkai/bunkai:latest
+  entrypoint: /app/action-entrypoint.sh

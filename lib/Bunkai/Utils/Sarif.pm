@@ -67,7 +67,7 @@ sub format_outdated_as_sarif_result {
 
     return +{
         ruleId    => 'BUNKAI-OUTDATED',
-        level     => 'warning',
+        level     => 'low',
         message   => +{ text => $message },
         locations => $location,
         properties => +{ tags => ['dependency'] },
@@ -89,7 +89,9 @@ sub map_dependency_to_sarif_results {
 
     if ( $dependency -> {has_vulnerabilities} ) {
         for my $vulnerability ( @{ $dependency -> {vulnerabilities} } ) {
-            next if $vulnerability -> {type} eq 'error';
+            if ( $vulnerability -> {type} eq 'error' ) {
+                next;
+            }
             push @results,
               format_vulnerability_as_sarif_result( $dependency, $vulnerability, $location );
         }
@@ -168,10 +170,12 @@ sub collect_sarif_rules {
 sub generate_sarif {
     my ( $dependencies, $cpanfile_path ) = @_;
 
-    croak q{'dependencies' must be an array reference}
-      if ref $dependencies ne 'ARRAY';
-    croak q{'cpanfile_path' must be a defined string}
-      if !defined $cpanfile_path || !length $cpanfile_path;
+    if ( ref $dependencies ne 'ARRAY' ) {
+        croak q{'dependencies' must be an array reference};
+    }
+    if ( !defined $cpanfile_path || !length $cpanfile_path ) {
+        croak q{'cpanfile_path' must be a defined string};
+    }
 
     my @results =
       map { map_dependency_to_sarif_results( $_, $cpanfile_path ) } @{$dependencies};
