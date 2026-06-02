@@ -6,7 +6,7 @@
       <img src="https://img.shields.io/badge/license-MIT-blue.svg">
     </a>
      <a href="https://github.com/lesis-lat/bunkai/releases">
-      <img src="https://img.shields.io/badge/version-0.0.4-blue.svg">
+      <img src="https://img.shields.io/badge/version-0.9.2-blue.svg">
     </a>
   </p>
 </p>
@@ -41,7 +41,7 @@ Bunkai aims to improve the security and reproducibility of Perl builds by addres
 git clone https://github.com/lesis-lat/bunkai.git && cd bunkai
 
 # Install dependencies
-cpanm --installdeps .
+cpanm --installdeps . --mirror https://cpan.metacpan.org --mirror-only -n
 ```
 
 ---
@@ -53,17 +53,23 @@ Bunkai is a command-line tool that accepts the path to your project directory an
 ```bash
 $ perl bunkai.pl --path /path/to/project
 $ perl bunkai.pl --path /path/to/project --sarif /path/to/output.sarif
+$ perl bunkai.pl --path /path/to/project --plan-updates /path/to/bunkai-updates.json
+$ perl bunkai.pl --path /path/to/project --apply-update-id vulnerability-fix-foo-bar-cve-2026-1234
+$ perl bunkai.pl --path /path/to/project --update-cpanfile
 ```
 ```bash
 $ perl bunkai.pl --help
 
-Bunkai v0.0.4
+Bunkai v0.9.2
 SCA for Perl Projects
 =====================
     Command          Description
     -------          -----------
     -p, --path=PATH      Path to the project containing a cpanfile
     -s, --sarif[=FILE]   Output results to a SARIF file (default: bunkai_results.sarif)
+    -u, --update-cpanfile   Update cpanfile with latest or fixed dependency versions
+    -P, --plan-updates[=FILE]   Write issue-scoped cpanfile updates to JSON (default: bunkai_updates.json)
+        --apply-update-id=ID    Apply a single issue-scoped update by ID
     -h, --help           Display this help menu
 ```
 
@@ -71,11 +77,11 @@ SCA for Perl Projects
 
 ### GitHub Actions
 
-You can run Bunkai from the GitHub Marketplace action or the published container image and upload SARIF results to GitHub Advanced Security.
+You can run Bunkai from the GitHub Marketplace action and upload SARIF results to GitHub Advanced Security.
 
-#### Marketplace action with SARIF upload
+#### Marketplace action with SARIF upload + one PR per issue
 
-Create `.github/workflows/bunkai.yml` in your repository and set `sarif-output` to enable SARIF:
+Create `.github/workflows/bunkai.yml` in each repository:
 
 ```yaml
 name: Bunkai SCA
@@ -85,65 +91,59 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
-  security-events: write
 
 jobs:
   bunkai:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run Bunkai
-        uses: lesis-lat/bunkai@v0.0.4
+        uses: lesis-lat/bunkai@0.9.2
         with:
           project-path: .
+          mode: orchestrate
+          install-project-deps: false
           sarif-output: bunkai-results.sarif
+          github-token: ${{ secrets.BUNKAI_GITHUB_TOKEN || github.token }}
+          create-prs: ${{ github.event_name != 'pull_request' }}
+          close-resolved-prs: ${{ github.event_name != 'pull_request' }}
+          dedupe-updates: true
 
       - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: bunkai-results.sarif
+          category: bunkai-sca
 ```
 
-#### Container image from GitHub Container Registry
+This workflow uploads SARIF to the Security tab and runs automated dependency-fix PR management in one action step. `orchestrate` mode plans issue updates, deduplicates same-target updates, opens/updates one PR per issue, and closes resolved `bunkai/*` PRs not present in the latest plan.
+For production repositories, pin the action to a released tag.
 
-Create `.github/workflows/bunkai-container.yml` in your repository:
+`install-project-deps` is optional and defaults to `false`. Enable it only when your workflow also needs to install and run repository-specific Perl tooling inside the action container.
 
-```yaml
-name: Bunkai SCA (Container)
+#### Orchestrate mode notes
 
-on:
-  pull_request:
-  push:
-    branches:
-      - main
+The orchestrated PR flow includes guardrails to keep PRs actionable and stable:
 
-permissions:
-  contents: read
-  security-events: write
-  packages: read
-
-jobs:
-  bunkai:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/lesis-lat/bunkai/bunkai:latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run Bunkai
-        run: perl /opt/bunkai/bunkai.pl --path . --sarif bunkai-results.sarif
-
-      - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: bunkai-results.sarif
-```
+- Single-issue update application only mutates the targeted dependency line in `cpanfile`.
+- Duplicate updates that target the same `module + target_version` are deduplicated (prefers `vulnerability_fix`).
+- Concurrent branch update races are handled with a safe retry path when `--force-with-lease` reports stale ref info.
+- PR lifecycle operations use GitHub REST API calls (via `gh api`) to avoid GraphQL field deprecation issues.
+- Dependencies reported by MetaCPAN as belonging to distribution `perl` are not auto-updated in `cpanfile`.
+  Use `requires 'perl', 'x.yyyzzz'` for interpreter pinning, and only pin core-module versions when you need a specific module API level.
 
 ### Example
 

@@ -19,9 +19,8 @@ sub parse_version_value {
         return;
     }
 
-    my $parsed_version = eval { version -> new($value) };
-
-    if ($@) {
+    my $parsed_version = eval { version->new($value) };
+    if ( !defined $parsed_version ) {
         return;
     }
 
@@ -31,11 +30,11 @@ sub parse_version_value {
 sub enrich_dependency {
     my ($dependency) = @_;
 
-    my $latest_version = fetch_latest_version( $dependency -> {module} );
+    my $latest_version = fetch_latest_version( $dependency->{module} );
     my $is_outdated    = 0;
 
-    if ( $dependency -> {has_version} && defined $latest_version ) {
-        my $current_version_parsed = parse_version_value( $dependency -> {version} );
+    if ( $dependency->{has_version} && defined $latest_version ) {
+        my $current_version_parsed = parse_version_value( $dependency->{version} );
         my $latest_version_parsed  = parse_version_value($latest_version);
 
         if ( defined $current_version_parsed

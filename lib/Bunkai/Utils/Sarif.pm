@@ -29,13 +29,13 @@ sub create_sarif_location {
 sub format_vulnerability_as_sarif_result {
     my ( $dependency, $vulnerability, $location ) = @_;
 
-    my $rule_id = $vulnerability -> {cve_id};
+    my $rule_id = $vulnerability->{cve_id};
     if ( !defined $rule_id || !length $rule_id ) {
         $rule_id = 'BUNKAI-VULN-UNKNOWN';
     }
     my $message =
-      sprintf 'Module \'%s\' has vulnerability %s: %s', $dependency -> {module}, $rule_id,
-      $vulnerability -> {description};
+      sprintf 'Module \'%s\' has vulnerability %s: %s', $dependency->{module}, $rule_id,
+      $vulnerability->{description};
 
     return +{
         ruleId    => $rule_id,
@@ -52,7 +52,7 @@ sub format_unpinned_as_sarif_result {
     return +{
         ruleId    => 'BUNKAI-UNPINNED',
         level     => 'warning',
-        message   => +{ text => "Module '$dependency -> {module}' has no version specified." },
+        message   => +{ text => "Module '$dependency->{module}' has no version specified." },
         locations => $location,
         properties => +{ tags => ['dependency'] },
     };
@@ -63,11 +63,11 @@ sub format_outdated_as_sarif_result {
 
     my $message =
       sprintf 'Module \'%s\' is outdated. Specified: %s, Latest: %s',
-      $dependency -> {module}, $dependency -> {version}, $dependency -> {latest_version};
+      $dependency->{module}, $dependency->{version}, $dependency->{latest_version};
 
     return +{
         ruleId    => 'BUNKAI-OUTDATED',
-        level     => 'low',
+        level     => 'warning',
         message   => +{ text => $message },
         locations => $location,
         properties => +{ tags => ['dependency'] },
@@ -80,16 +80,16 @@ sub map_dependency_to_sarif_results {
     my @results;
     my $location = create_sarif_location($cpanfile_path);
 
-    if ( !$dependency -> {has_version} ) {
+    if ( !$dependency->{has_version} ) {
         push @results, format_unpinned_as_sarif_result( $dependency, $location );
     }
-    if ( $dependency -> {has_version} && $dependency -> {is_outdated} ) {
+    if ( $dependency->{has_version} && $dependency->{is_outdated} ) {
         push @results, format_outdated_as_sarif_result( $dependency, $location );
     }
 
-    if ( $dependency -> {has_vulnerabilities} ) {
-        for my $vulnerability ( @{ $dependency -> {vulnerabilities} } ) {
-            if ( $vulnerability -> {type} eq 'error' ) {
+    if ( $dependency->{has_vulnerabilities} ) {
+        for my $vulnerability ( @{ $dependency->{vulnerabilities} } ) {
+            if ( $vulnerability->{type} eq 'error' ) {
                 next;
             }
             push @results,
@@ -124,7 +124,7 @@ sub collect_sarif_rules {
     my $help_uri = 'https://github.com/gunderf/bunkai-sca-tool';
 
     for my $dependency ( @{$dependencies} ) {
-        if ( !$dependency -> {has_version} ) {
+        if ( !$dependency->{has_version} ) {
             $rule_map{'BUNKAI-UNPINNED'} = create_sarif_rule_descriptor(
                 'BUNKAI-UNPINNED',
                 'Dependency is missing a pinned version.',
@@ -134,7 +134,7 @@ sub collect_sarif_rules {
             );
         }
 
-        if ( $dependency -> {has_version} && $dependency -> {is_outdated} ) {
+        if ( $dependency->{has_version} && $dependency->{is_outdated} ) {
             $rule_map{'BUNKAI-OUTDATED'} = create_sarif_rule_descriptor(
                 'BUNKAI-OUTDATED',
                 'Dependency version is out of date.',
@@ -144,22 +144,24 @@ sub collect_sarif_rules {
             );
         }
 
-        if ( $dependency -> {has_vulnerabilities} ) {
-            for my $vulnerability ( @{ $dependency -> {vulnerabilities} } ) {
-                if ( $vulnerability -> {type} ne 'error' ) {
-                    my $rule_id = $vulnerability -> {cve_id};
-                    if ( !defined $rule_id || !length $rule_id ) {
-                        $rule_id = 'BUNKAI-VULN-UNKNOWN';
-                    }
-
-                    $rule_map{$rule_id} = create_sarif_rule_descriptor(
-                        $rule_id,
-                        'Dependency vulnerability identified.',
-                        [ 'security', 'dependency' ],
-                        $help_uri,
-                        '8.0'
-                    );
+        if ( $dependency->{has_vulnerabilities} ) {
+            for my $vulnerability ( @{ $dependency->{vulnerabilities} } ) {
+                if ( $vulnerability->{type} eq 'error' ) {
+                    next;
                 }
+
+                my $rule_id = $vulnerability->{cve_id};
+                if ( !defined $rule_id || !length $rule_id ) {
+                    $rule_id = 'BUNKAI-VULN-UNKNOWN';
+                }
+
+                $rule_map{$rule_id} = create_sarif_rule_descriptor(
+                    $rule_id,
+                    'Dependency vulnerability identified.',
+                    [ 'security', 'dependency' ],
+                    $help_uri,
+                    '8.0'
+                );
             }
         }
     }

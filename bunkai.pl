@@ -19,12 +19,21 @@ use Bunkai::Utils::Helper qw(get_interface_info);
 our $VERSION = '0.0.4';
 
 sub main {
-    my ( $project_path, $show_help, $sarif_output_file, $update_cpanfile );
+    my (
+        $project_path,
+        $show_help,
+        $sarif_output_file,
+        $update_cpanfile,
+        $plan_updates_file,
+        $apply_update_id
+    );
 
     GetOptions(
         'path=s'            => \$project_path,
         'sarif|s:s'         => \$sarif_output_file,
         'update-cpanfile|u' => \$update_cpanfile,
+        'plan-updates|P:s'  => \$plan_updates_file,
+        'apply-update-id=s' => \$apply_update_id,
         'help|h'            => \$show_help,
       )
       or croak get_interface_info();
@@ -47,16 +56,18 @@ sub main {
         project_path      => $project_path,
         sarif_output_file => $sarif_output_file,
         update_cpanfile   => $update_cpanfile,
+        plan_updates_file => $plan_updates_file,
+        apply_update_id   => $apply_update_id,
     );
 
-    if ( !$result -> {success} ) {
-        my $message = $result -> {message};
+    if ( !$result->{success} ) {
+        my $message = $result->{message};
         print {*STDERR} "$message\n"
           or croak "Cannot print warning to STDERR: $OS_ERROR";
-        return $result -> {exit_code};
+        return $result->{exit_code};
     }
 
-    return $result -> {exit_code};
+    return $result->{exit_code};
 }
 
 exit main();

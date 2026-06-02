@@ -7,14 +7,19 @@ RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/
 RUN cpanm App::cpanminus
 
 COPY cpanfile /app/
-RUN cpanm --notest --installdeps .
+RUN cpanm --notest --installdeps . --mirror https://cpan.metacpan.org --mirror-only
 
 FROM perl:5.42-slim
 
 WORKDIR /app
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git curl jq gh ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /usr/local/lib/perl5 /usr/local/lib/perl5
-COPY --from=builder /usr/local/bin/cpanm /usr/local/bin/
+# Copy all installed Perl executables (cpan-audit, cpanm, cover, etc.).
+COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 COPY lib /app/lib
 COPY bunkai.pl /app/bunkai.pl

@@ -14,13 +14,18 @@ our $VERSION   = '0.0.4';
 sub fetch_latest_version {
     my ($module_name) = @_;
 
-    my $metacpan_client = MetaCPAN::Client -> new();
+    my $metacpan_client = MetaCPAN::Client->new();
     my $version;
 
     try {
-        my $module = $metacpan_client -> module($module_name);
+        my $module = $metacpan_client->module($module_name);
         if ($module) {
-            $version = $module -> version;
+            # Skip core modules shipped in the perl distribution to avoid
+            # proposing perl release versions as module versions.
+            if ( ( $module->distribution // q{} ) eq 'perl' ) {
+                return;
+            }
+            $version = $module->version;
         }
     }
     catch {

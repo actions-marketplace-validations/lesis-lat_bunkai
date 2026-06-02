@@ -10,6 +10,22 @@ inputs:
     description: 'The path to the project to be analyzed by Bunkai.'
     required: false
     default: '.'
+  mode:
+    description: 'Bunkai execution mode: scan, plan, apply, update, or orchestrate.'
+    required: false
+    default: 'scan'
+  install-project-deps:
+    description: 'Install project dependencies with cpanm before running Bunkai.'
+    required: false
+    default: 'false'
+  plan-output-file:
+    description: 'Output file for planned issue updates (JSON).'
+    required: false
+    default: 'bunkai-updates.json'
+  apply-update-id:
+    description: 'Issue update ID to apply when mode=apply.'
+    required: false
+    default: ''
   perlcritic-severity:
     description: 'The severity level for Perl::Critic.'
     required: false
@@ -17,7 +33,7 @@ inputs:
   perlcritic-paths:
     description: 'The paths to lint with Perl::Critic.'
     required: false
-    default: 'lib bunkai.pl'
+    default: ''
   sarif-output:
     description: 'The SARIF output file path.'
     required: false
@@ -25,12 +41,37 @@ inputs:
   test-command:
     description: 'The command to run tests with coverage.'
     required: false
-    default: |
-      PERL5OPT=-MDevel::Cover=-db,coverage_db,-silent,1 prove -lvr tests/
-      cover -report text
-      cover -test
+    default: ''
+  github-token:
+    description: 'GitHub token used by orchestrate mode for PR management.'
+    required: false
+    default: ''
+  create-prs:
+    description: 'Create/update one PR per issue in orchestrate mode.'
+    required: false
+    default: 'true'
+  close-resolved-prs:
+    description: 'Close stale bunkai/* PRs not present in the latest plan in orchestrate mode.'
+    required: false
+    default: 'true'
+  dedupe-updates:
+    description: 'Deduplicate planned updates by module+target version in orchestrate mode.'
+    required: false
+    default: 'true'
+  pr-branch-prefix:
+    description: 'Branch prefix for PR branches in orchestrate mode.'
+    required: false
+    default: 'bunkai'
+  pr-labels:
+    description: 'Comma-separated labels to apply in orchestrate mode.'
+    required: false
+    default: 'dependencies,security'
+
+outputs:
+  plan-output-file:
+    description: 'Resolved path to the generated updates plan JSON file (mode=plan).'
 
 runs:
   using: docker
-  image: docker://ghcr.io/lesis-lat/bunkai/bunkai:latest
+  image: Dockerfile
   entrypoint: /app/action-entrypoint.sh
